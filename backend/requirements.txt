@@ -1,0 +1,17 @@
+# PSL Studio backend — install with:  pip install -r backend/requirements.txt
+fastapi>=0.110
+uvicorn>=0.29
+requests>=2.31
+pydantic>=2.6
+pillow>=10.2
+numpy>=1.26
+mediapipe>=0.10.14        # face-mesh landmark extraction (468+ points)
+
+# Optional providers -----------------------------------------------------
+# llama.cpp in-process backend with explicit n_gpu_layers VRAM control:
+#   pip install llama-cpp-python            # CPU
+#   CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python   # NVIDIA GPU
+#   CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python  # Apple Silicon
+# llama-cpp-python
+
+# Ollama is an external program (https://ollama.com); no python dep needed.

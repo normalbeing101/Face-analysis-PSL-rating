@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSL Studio — Facial Harmony Analysis</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◌</span>
+      <h1>PSL <em>Studio</em></h1>
+    </div>
+    <nav>
+      <button id="btn-settings" class="ghost-btn" title="Configure your local VLM">⚙ Model settings</button>
+      <span id="health-pill" class="pill pill-off">VLM: checking…</span>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: input -->
+    <section class="card drop-card" id="drop-zone">
+      <div class="drop-inner" id="drop-inner">
+        <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="3" y="5" width="18" height="14" rx="2"/>
+          <circle cx="9" cy="10" r="1.6"/>
+          <path d="M5 17l4.5-5 3 3.2L16 12l3 3.5"/>
+        </svg>
+        <p><strong>Drop a face photo</strong> or click to browse</p>
+        <small>Frontal, evenly lit photos give the best landmark fit.</small>
+        <input type="file" id="file-input" accept="image/*" hidden />
+      </div>
+      <img id="preview" class="preview" alt="" hidden />
+
+      <div class="options">
+        <label class="row">
+          <span>Preset</span>
+          <select id="preset-select"></select>
+        </label>
+        <label class="row">
+          <span>Band tolerance</span>
+          <input type="range" id="band-scale" min="0.5" max="2" step="0.05" value="1" />
+          <output id="band-out">1.00×</output>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="use-vlm" checked />
+          <span>AI advice from my local VLM</span>
+        </label>
+        <input type="text" id="question" class="question" placeholder="Optional question for the model…" />
+        <button id="btn-analyze" class="primary-btn" disabled>Analyze</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: results -->
+    <section class="results" id="results">
+      <div class="empty-state" id="empty-state">
+        <p>Results appear here.</p>
+        <small>Angles, ratios and symmetry are computed deterministically; the VLM only interprets them.</small>
+      </div>
+
+      <div id="verdict-card" class="card verdict" hidden>
+        <div class="tier-block">
+          <div class="tier-letter" id="tier-letter">–</div>
+          <div>
+            <div class="rating-big"><span id="rating-num">–</span><span class="rating-den">/10</span></div>
+            <div class="sub-tier" id="sub-tier"></div>
+          </div>
+        </div>
+        <div class="pillars">
+          <div class="pillar"><span>Angles</span><div class="bar"><i id="bar-angles"></i></div></div>
+          <div class="pillar"><span>Ratios</span><div class="bar"><i id="bar-ratios"></i></div></div>
+          <div class="pillar"><span>Symmetry</span><div class="bar"><i id="bar-symmetry"></i></div></div>
+        </div>
+        <img id="overlay-img" class="overlay" alt="landmark overlay" hidden />
+      </div>
+
+      <div id="advice-card" class="card advice" hidden>
+        <h2>Model read <small id="advice-model"></small></h2>
+        <p id="advice-summary"></p>
+        <div class="two-col">
+          <div><h3>Strengths</h3><ul id="advice-strengths"></ul></div>
+          <div><h3>Watch-outs</h3><ul id="advice-weaknesses"></ul></div>
+        </div>
+        <p id="advice-harmony" class="harmony-notes"></p>
+        <p id="advice-user-answer" class="user-answer" hidden></p>
+      </div>
+
+      <div id="metrics-card" class="card metrics" hidden>
+        <h2>PSL measurements</h2>
+        <div class="seg"><button data-tab="ratios" class="active">Ratios</button><button data-tab="angles">Angles</button><button data-tab="symmetry">Symmetry</button></div>
+        <table id="metrics-table"><tbody></tbody></table>
+      </div>
+    </section>
+  </main>
+
+  <!-- SETTINGS MODAL -->
+  <dialog id="settings-modal">
+    <form method="dialog" class="settings-form">
+      <h2>Local VLM settings</h2>
+      <p class="muted">Nothing is hardcoded — point this at Ollama, LM Studio, llama.cpp or any OpenAI-compatible server running on your PC.</p>
+
+      <label>Provider
+        <select id="cfg-provider">
+          <option value="ollama">Ollama (recommended)</option>
+          <option value="openai">OpenAI-compatible (LM Studio / vLLM / llama.cpp server)</option>
+          <option value="llamacpp">llama.cpp (in-process, .gguf path)</option>
+        </select>
+      </label>
+      <label>Base URL <input id="cfg-url" placeholder="http://localhost:11434" /></label>
+      <label>API key (optional) <input id="cfg-key" type="password" placeholder="only needed for remote servers" /></label>
+
+      <label>Vision model
+        <div class="model-row">
+          <select id="cfg-model"><option value="">— load models first —</option></select>
+          <button type="button" class="ghost-btn" id="btn-refresh-models">Refresh</button>
+        </div>
+        <small id="model-note" class="muted">Only vision-capable (VLM) models can analyze photos.</small>
+      </label>
+
+      <fieldset>
+        <legend>VRAM</legend>
+        <label>Mode
+          <select id="vram-mode">
+            <option value="auto">Auto — fit as many layers as VRAM allows</option>
+            <option value="full_gpu">Full GPU offload</option>
+            <option value="cpu_only">CPU only (no VRAM)</option>
+            <option value="manual">Manual layer count</option>
+          </select>
+        </label>
+        <div class="grid-2">
+          <label>Budget (GB) <input id="vram-budget" type="number" min="1" max="192" step="0.5" /></label>
+          <label>GPU layers (manual) <input id="vram-layers" type="number" min="-1" step="1" /></label>
+          <label>Context length <input id="ctx-len" type="number" min="2048" step="512" /></label>
+          <label>CPU threads <input id="cpu-threads" type="number" min="1" max="64" step="1" /></label>
+        </div>
+        <label class="check-row"><input id="kv4" type="checkbox" /><span>4-bit KV cache (saves VRAM)</span></label>
+        <label class="check-row"><input id="flash" type="checkbox" /><span>Flash attention</span></label>
+      </fieldset>
+
+      <div class="modal-actions">
+        <button type="button" class="ghost-btn" id="btn-test-vlm">Test connection</button>
+        <span id="test-result" class="muted"></span>
+      </div>
+      <div class="modal-actions end">
+        <button type="button" class="ghost-btn" id="btn-close-settings">Cancel</button>
+        <button type="button" class="primary-btn" id="btn-save-settings">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
